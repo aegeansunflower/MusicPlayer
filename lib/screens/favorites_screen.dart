@@ -26,28 +26,38 @@ class FavoritesScreen extends StatelessWidget {
         }
 
         // Filter all local songs down to only favorites
-        final allSongs = audioService.getLocalSongs();
+        final allSongsFuture = audioService.getLocalSongs();
 
         return FutureBuilder<List<SongModel>>(
-          future: allSongs,
+          future: allSongsFuture,
           builder: (context, songSnapshot) {
             if (songSnapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             }
 
+            // Filter the full list to get only the favorites
             final favoriteSongs = songSnapshot.data
                 ?.where((song) => favoriteIds.contains(song.id))
                 .toList() ?? [];
 
+            if (favoriteSongs.isEmpty) {
+              return Center(
+                child: Text(
+                  'No local favorite songs found.',
+                  style: Theme.of(context).textTheme.bodyLarge!.copyWith(color: Colors.white54),
+                ),
+              );
+            }
+
             return ListView.builder(
-              // CRITICAL: Padding for the bottom bar
-              padding: const EdgeInsets.only(bottom: 150.0),
+              // CRITICAL: Padding for the MiniPlayer and Nav Bar
+              padding: const EdgeInsets.only(bottom: 160.0),
               itemCount: favoriteSongs.length,
               itemBuilder: (context, index) {
                 final song = favoriteSongs[index];
                 return TrackListItem(
                   audioService: audioService,
-                  // Play only the favorite songs from the filtered list
+                  // The playlist is now only the favorite songs
                   songs: favoriteSongs,
                   song: song,
                   index: index,

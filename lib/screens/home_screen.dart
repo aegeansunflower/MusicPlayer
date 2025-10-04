@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:on_audio_query/on_audio_query.dart';
+import 'dart:async'; // For Future
 
 import '../services/audio_service.dart';
 import '../widgets/mini_player.dart';
@@ -30,8 +31,7 @@ class AllTracksScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // CRITICAL: Padding must account for the NEW MiniPlayer (~90) + Nav Bar (~60).
-    // Adjusted from 130.0 to 160.0 to ensure the track list scrolls fully above the fixed bottom bar area.
+    // Padding accounts for the MiniPlayer and Nav Bar.
     return ListView.builder(
       controller: scrollController,
       padding: const EdgeInsets.only(bottom: 160.0),
@@ -49,9 +49,241 @@ class AllTracksScreen extends StatelessWidget {
   }
 }
 
-// -----------------------------------------------------------------
-// --- Custom Bottom Navigation Row (Fixed Height) ---
-// -----------------------------------------------------------------
+// --- Main Screen Widget ---
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  int _selectedIndex = 0;
+  final AudioService audioService = AudioService();
+  SongSortMode _currentSortMode = SongSortMode.title;
+
+  // New: State management for the song list future
+  late Future<List<SongModel>> _allSongsFuture; // Keep 'late'
+  List<SongModel> _allSongs = [];
+  final ScrollController _scrollController = ScrollController();
+
+  // FIX: Initialize the late variable here by calling _loadSongs()
+  @override
+  void initState() {
+    super.initState();
+    _loadSongs(); // Call loadSongs immediately to initialize _allSongsFuture
+  }
+
+  @override
+  void dispose() {
+    audioService.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  // New Method: Loads songs and updates the Future state
+  void _loadSongs() {
+    // FIX: Assign _allSongsFuture here. Since _loadSongs is called in initState,
+    // the Future will be ready before the first build.
+    _allSongsFuture = audioService.getLocalSongs().then((songs) {
+      // Filter out invalid/unplayable tracks (e.g., duration < 5 seconds)
+      _allSongs = songs.where((song) => song.duration != null && song.duration! > 5000).toList();
+      _sortSongs(_currentSortMode); // Apply current sort mode after load
+      return _allSongs;
+    });
+
+    // Call setState to ensure the FutureBuilder runs when the Future is assigned.
+    // This is safe even in initState because setState in initState only flags a build.
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  // New Method: Handles song rescan
+  Future<void> _rescanSongs() async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Rescanning songs...'),
+        duration: Duration(seconds: 1),
+      ),
+    );
+    _loadSongs(); // Reruns the song query, which updates _allSongsFuture
+  }
+
+  // Existing Method: Sorts the song list based on the current mode
+  void _sortSongs(SongSortMode mode) {
+    _currentSortMode = mode;
+
+    // NOTE: This sorting should only happen on the internal _allSongs list
+    // after the FutureBuilder returns data, or inside _loadSongs().
+    switch (mode) {
+      case SongSortMode.title:
+        _allSongs.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+        break;
+      case SongSortMode.recentlyAdded:
+      // Sort by date added (newest first)
+        _allSongs.sort((a, b) => (b.dateAdded ?? 0).compareTo(a.dateAdded ?? 0));
+        break;
+      case SongSortMode.durationLongest:
+      // Sort by duration (longest first)
+        _allSongs.sort((a, b) => (b.duration ?? 0).compareTo(a.duration ?? 0));
+        break;
+      case SongSortMode.durationShortest:
+      // Sort by duration (shortest first)
+        _allSongs.sort((a, b) => (a.duration ?? 0).compareTo(b.duration ?? 0));
+        break;
+    }
+
+    // Trigger a rebuild only if we are on the main tracks screen
+    if (_selectedIndex == 0 && mounted) {
+      setState(() {});
+    }
+  }
+
+  // Existing Method: Shows the sorting dialog
+  void _showSortModeDialog() {
+    showDialog<SongSortMode>(
+      context: context,
+      builder: (BuildContext context) {
+        return SimpleDialog(
+          title: const Text('Sort By', style: TextStyle(color: Colors.white)),
+          backgroundColor: const Color(0xFF282828),
+          children: SongSortMode.values.map((mode) {
+            return SimpleDialogOption(
+              onPressed: () {
+                Navigator.pop(context, mode);
+              },
+              child: Text(
+                mode.toString().split('.').last.replaceAllMapped(
+                    RegExp(r'([A-Z])'), (m) => ' ${m.group(0)}'),
+                style: TextStyle(
+                  color: _currentSortMode == mode ? Theme.of(context).primaryColor : Colors.white70,
+                ),
+              ),
+            );
+          }).toList(),
+        );
+      },
+    ).then((selectedMode) {
+      if (selectedMode != null && selectedMode != _currentSortMode) {
+        _sortSongs(selectedMode);
+      }
+    });
+  }
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const double bottomNavHeight = 0.0;
+
+    // The widget options, now using _allSongs
+    final List<Widget> widgetOptions = [
+      // 1. All Tracks Screen (Wrapped in FutureBuilder for loading state)
+      FutureBuilder<List<SongModel>>(
+        // Uses the initialized Future
+        future: _allSongsFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting && _allSongs.isEmpty) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(child: Text('Error loading songs: ${snapshot.error}', style: const TextStyle(color: Colors.white70)));
+          }
+
+          final loadedSongs = snapshot.data ?? _allSongs; // Use loaded data or current state
+          if (loadedSongs.isEmpty) {
+            return Center(child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text('No songs found.', style: TextStyle(color: Colors.white70)),
+                TextButton.icon(
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Rescan Storage'),
+                  onPressed: _rescanSongs,
+                ),
+              ],
+            ));
+          }
+
+          _allSongs = loadedSongs; // Update the list reference before passing
+
+          return AllTracksScreen(
+            audioService: audioService,
+            allSongs: _allSongs,
+            scrollController: _scrollController,
+          );
+        },
+      ),
+      // 2. Search Screen
+      SearchScreen(
+        audioService: audioService,
+        allSongs: _allSongs, // Pass the current state of loaded songs
+        onClose: () => _onItemTapped(0),
+      ),
+      // 3. Favorites Screen
+      FavoritesScreen(audioService: audioService),
+    ];
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+            _selectedIndex == 0
+                ? 'All Tracks'
+                : _selectedIndex == 2
+                ? 'Your Favorites'
+                : 'Search',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 28)
+        ),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+
+        actions: [
+          if (_selectedIndex == 0) ...[
+            // Existing Sort Button
+            IconButton(
+              icon: const Icon(Icons.sort, color: Colors.white),
+              onPressed: _showSortModeDialog,
+            ),
+            // NEW Rescan Button (to the right of the sort button)
+            IconButton(
+              icon: const Icon(Icons.refresh, color: Colors.white),
+              onPressed: _rescanSongs, // Use the new rescan method
+            ),
+          ],
+        ],
+      ),
+
+      bottomNavigationBar: _CustomNavigationBar(
+        selectedIndex: _selectedIndex,
+        onItemTapped: _onItemTapped,
+      ),
+
+      // Body uses a Stack to layer content and the MiniPlayer
+      body: Stack(
+        children: [
+          // 1. Main Content
+          Positioned.fill(
+            child: widgetOptions.elementAt(_selectedIndex),
+          ),
+
+          // 2. MINI PLAYER (Fixed to the bottom, above the Navigation Bar)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: bottomNavHeight,
+            child: MiniPlayer(audioService: audioService),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// --- Helper Widget for the Bottom Navigation Bar ---
 class _CustomNavigationBar extends StatelessWidget {
   final int selectedIndex;
   final Function(int) onItemTapped;
@@ -61,235 +293,29 @@ class _CustomNavigationBar extends StatelessWidget {
     required this.onItemTapped,
   });
 
-  Widget _buildNavItem(BuildContext context, int index, IconData icon, String label) {
-    final bool isSelected = index == selectedIndex;
-    final Color selectedColor = Theme.of(context).primaryColor;
-    final Color color = isSelected ? selectedColor : Colors.white54;
-
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => onItemTapped(index),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: color, size: 28),
-            const SizedBox(height: 2),
-            Text(label,
-                textAlign: TextAlign.center,
-                style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
-          ],
+  @override
+  Widget build(BuildContext context) {
+    return BottomNavigationBar(
+      items: const <BottomNavigationBarItem>[
+        BottomNavigationBarItem(
+          icon: Icon(Icons.music_note),
+          label: 'Tracks',
         ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // Determine height for bottom safe area padding
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
-
-    return Container(
-      // Fixed height for the navigation icons row + bottom padding
-      height: 60 + bottomPadding,
-      padding: EdgeInsets.only(bottom: bottomPadding),
-      color: Theme.of(context).scaffoldBackgroundColor,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          _buildNavItem(context, 0, Icons.home_filled, 'HOME'),
-          _buildNavItem(context, 1, Icons.search, 'SEARCH'),
-          _buildNavItem(context, 2, Icons.favorite, 'FAVORITES'),
-        ],
-      ),
-    );
-  }
-}
-
-// -----------------------------------------------------------------
-// --- Main Home Screen with Navigation ---
-// -----------------------------------------------------------------
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
-
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  final AudioService audioService = AudioService();
-  int _selectedIndex = 0; // 0: Home, 1: Search, 2: Favorites
-  SongSortMode _sortMode = SongSortMode.title; // Default sort mode
-  final ScrollController _scrollController = ScrollController();
-
-
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-
-    // Scroll to top when switching to Home or Favorites
-    if (index != 1 && _scrollController.hasClients) {
-      _scrollController.animateTo(
-        0.0,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
-    }
-  }
-
-  // ⭐️ Sort Dialog Method
-  void _showSortModeDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Sort Music By'),
-          contentPadding: const EdgeInsets.symmetric(vertical: 8.0),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildSortOption(context, SongSortMode.title, 'Title (A-Z)'),
-              _buildSortOption(context, SongSortMode.recentlyAdded, 'Recently Added'),
-              _buildSortOption(context, SongSortMode.durationLongest, 'Duration (Longest First)'),
-              _buildSortOption(context, SongSortMode.durationShortest, 'Duration (Shortest First)'),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  // Helper for building sort option ListTiles
-  Widget _buildSortOption(BuildContext context, SongSortMode mode, String title) {
-    final bool isSelected = _sortMode == mode;
-    return ListTile(
-      title: Text(title),
-      trailing: isSelected ? Icon(Icons.check, color: Theme.of(context).primaryColor) : null,
-      onTap: () {
-        setState(() {
-          _sortMode = mode;
-        });
-        Navigator.of(context).pop();
-      },
-    );
-  }
-
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<List<SongModel>>(
-      future: audioService.getLocalSongs(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        final allSongs = snapshot.data ?? [];
-
-        if (allSongs.isEmpty) {
-          return const Center(
-              child: Text('No songs found or permission denied.',
-                  style: TextStyle(color: Colors.white70)));
-        }
-
-        // Apply Sorting Logic
-        List<SongModel> sortedSongs = List.from(allSongs);
-
-        sortedSongs.sort((a, b) {
-          final dateA = a.dateAdded ?? 0;
-          final dateB = b.dateAdded ?? 0;
-          final durationA = a.duration ?? 0;
-          final durationB = b.duration ?? 0;
-
-          switch (_sortMode) {
-            case SongSortMode.recentlyAdded:
-              return dateB.compareTo(dateA); // Newest first (Descending)
-            case SongSortMode.durationLongest:
-              return durationB.compareTo(durationA); // Longest first (Descending)
-            case SongSortMode.durationShortest:
-              return durationA.compareTo(durationB); // Shortest first (Ascending)
-            case SongSortMode.title:
-            return a.title.compareTo(b.title); // Title A-Z (Ascending)
-          }
-        });
-
-
-        // Define the content widgets for the main view
-        final List<Widget> widgetOptions = <Widget>[
-          // 0: Home/Tracks Screen
-          AllTracksScreen(
-            audioService: audioService,
-            allSongs: sortedSongs, // Pass the sorted list
-            scrollController: _scrollController,
-          ),
-
-          // 1: Search Screen
-          SearchScreen(
-            audioService: audioService,
-            allSongs: allSongs, // Search works best on the unsorted list
-            onClose: () {
-              setState(() {
-                _selectedIndex = 0; // Go to Home
-              });
-            },
-          ),
-
-          // 2: Favorites Screen
-          FavoritesScreen(audioService: audioService),
-        ];
-
-        // Get the height of the bottom nav bar for positioning the MiniPlayer
-        final bottomNavHeight = MediaQuery.of(context).padding.bottom;
-        // MiniPlayer height is now 90.0
-
-        return Scaffold(
-          appBar: AppBar(
-            title: Text(
-                _selectedIndex == 0
-                    ? 'Local Music'
-                    : _selectedIndex == 2
-                    ? 'Your Favorites'
-                    : 'Search',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 28)
-            ),
-            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-
-            // Filter/Sort Button
-            actions: [
-              if (_selectedIndex == 0) // Only show on Home Screen
-                IconButton(
-                  icon: const Icon(Icons.sort, color: Colors.white),
-                  onPressed: _showSortModeDialog,
-                ),
-            ],
-          ),
-
-          bottomNavigationBar: _CustomNavigationBar(
-            selectedIndex: _selectedIndex,
-            onItemTapped: _onItemTapped,
-          ),
-
-          // Body uses a Stack to layer content and the MiniPlayer
-          body: Stack(
-            children: [
-              // 1. Main Content (padded to fit MiniPlayer and Nav Bar)
-              Positioned.fill(
-                child: widgetOptions.elementAt(_selectedIndex),
-              ),
-
-              // 2. MINI PLAYER (Fixed to the bottom, above the Navigation Bar)
-              Positioned(
-                left: 0,
-                right: 0,
-                // Positioned right above the bottomNavigationBar
-                bottom: bottomNavHeight,
-                child: MiniPlayer(audioService: audioService),
-              ),
-            ],
-          ),
-        );
-      },
+        BottomNavigationBarItem(
+          icon: Icon(Icons.search),
+          label: 'Search',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.favorite),
+          label: 'Favorites',
+        ),
+      ],
+      currentIndex: selectedIndex,
+      onTap: onItemTapped,
+      backgroundColor: const Color(0xFF181818),
+      selectedItemColor: Theme.of(context).primaryColor,
+      unselectedItemColor: Colors.white70,
+      type: BottomNavigationBarType.fixed,
     );
   }
 }

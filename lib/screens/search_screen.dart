@@ -89,7 +89,7 @@ class _SearchScreenState extends State<SearchScreen> {
       )
           : ListView.builder(
         // Extra padding for MiniPlayer visibility
-        padding: const EdgeInsets.only(bottom: 80),
+        padding: const EdgeInsets.only(bottom: 130.0),
         itemCount: _filteredSongs.length,
         itemBuilder: (context, index) {
           final song = _filteredSongs[index];

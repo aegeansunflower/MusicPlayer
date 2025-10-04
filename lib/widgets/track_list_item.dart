@@ -23,6 +23,9 @@ class TrackListItem extends StatelessWidget {
     final activeColor = Theme.of(context).primaryColor;
 
     return ListTile(
+      // On Tap: Start playback of the entire list from this song
+      onTap: () => audioService.play(songs, index: index),
+
       // Album Art Placeholder
       leading: QueryArtworkWidget(
         id: song.id,
@@ -59,10 +62,6 @@ class TrackListItem extends StatelessWidget {
           );
         },
       ),
-
-      onTap: () {
-        audioService.setQueueAndPlay(songs, index);
-      },
     );
   }
 }

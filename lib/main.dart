@@ -14,8 +14,9 @@ class MyApp extends StatelessWidget {
       title: 'Modern Music Player',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        scaffoldBackgroundColor: const Color(0xFF121212),
-        primaryColor: const Color(0xFFBB86FC),
+        // Dark theme colors based on Spotify/Material dark theme principles
+        scaffoldBackgroundColor: const Color(0xFF121212), // Very dark gray
+        primaryColor: const Color(0xFFBB86FC), // Purple accent
         brightness: Brightness.dark,
         textTheme: const TextTheme(
           headlineMedium: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
