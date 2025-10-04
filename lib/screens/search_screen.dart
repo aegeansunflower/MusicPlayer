@@ -34,6 +34,7 @@ class _SearchScreenState extends State<SearchScreen> {
     super.dispose();
   }
 
+  // Uses a debounce timer to avoid filtering on every single key press
   void _updateSearch(String newQuery) {
     _searchQuery = newQuery;
 
@@ -50,10 +51,7 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        automaticallyImplyLeading: false,
         title: TextField(
           controller: _controller,
           autofocus: true,
@@ -68,7 +66,7 @@ class _SearchScreenState extends State<SearchScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.close, color: Colors.white),
-            onPressed: widget.onClose,
+            onPressed: widget.onClose, // Use the provided callback to exit search
           ),
         ],
       ),
@@ -89,12 +87,13 @@ class _SearchScreenState extends State<SearchScreen> {
       )
           : ListView.builder(
         // Extra padding for MiniPlayer visibility
-        padding: const EdgeInsets.only(bottom: 130.0),
+        padding: const EdgeInsets.only(bottom: 160.0),
         itemCount: _filteredSongs.length,
         itemBuilder: (context, index) {
           final song = _filteredSongs[index];
           return TrackListItem(
             audioService: widget.audioService,
+            // Play from the filtered search results
             songs: _filteredSongs,
             song: song,
             index: index,

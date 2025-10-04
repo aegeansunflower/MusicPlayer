@@ -49,12 +49,12 @@ class _MiniPlayerContainer extends StatelessWidget {
     return Container(
       // Total height: 60 (controls) + 30 (seek bar) = 90
       height: 90,
-      margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 0),
-      padding: const EdgeInsets.symmetric(horizontal: 4.0),
+      margin: const EdgeInsets.symmetric(horizontal: 0.0, vertical: 0),
+      padding: const EdgeInsets.symmetric(horizontal: 7.0),
       decoration: BoxDecoration(
-        color: primaryColor.withOpacity(.9),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: primaryColor, width: 0.5),
+        color: Theme.of(context).scaffoldBackgroundColor.withOpacity(1),
+        borderRadius: BorderRadius.circular(0),
+        border: Border.all(color: primaryColor, width: .5),
       ),
       child: child,
     );
@@ -231,7 +231,6 @@ class _SeekBar extends StatelessWidget {
                         0.0, duration.inMilliseconds.toDouble()),
                     activeColor: primaryColor,
                     inactiveColor: Colors.white12,
-                    // Use on change start/end to prevent stream jitter during drag
                     onChanged: (double value) {
                       audioService.seek(Duration(milliseconds: value.toInt()));
                     },

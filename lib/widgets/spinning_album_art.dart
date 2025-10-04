@@ -42,20 +42,26 @@ class _SpinningAlbumArtState extends State<SpinningAlbumArt>
 
     // Animation Tween: defines the slow, floating shift (2% left/right, 2% up/down)
     _animation = Tween<Offset>(
-      begin: const Offset(-0.02, 0.02), // Start slightly offset
-      end: const Offset(0.02, -0.02), // End slightly offset
+      begin: const Offset(0.02, 0.02), // Start slightly right and down
+      end: const Offset(-0.02, -0.02), // End slightly left and up
     ).animate(CurvedAnimation(
       parent: _controller,
-      curve: Curves.easeInOut,
+      curve: Curves.easeInOut, // Smooth acceleration/deceleration
     ));
 
-    // Listen to player state to control the animation loop
+    // Start the animation immediately and repeat in reverse for the wavy motion
+    _controller.repeat(reverse: true);
+
+
+    // Subscribe to the stream to manage animation state
     _playerStateSubscription = widget.playerStateStream.listen((state) {
       if (state.playing) {
-        // Start the repeating animation when playing
-        _controller.repeat(reverse: true);
+        // If playing, ensure the animation continues
+        if (!_controller.isAnimating) {
+          _controller.repeat(reverse: true);
+        }
       } else {
-        // Stop the animation when paused
+        // If paused, stop the animation
         _controller.stop();
       }
     });
@@ -92,7 +98,7 @@ class _SpinningAlbumArtState extends State<SpinningAlbumArt>
 
     // Attempt to load artwork
     return QueryArtworkWidget(
-      id: widget.metadata!.id, // Use null assertion here as we checked above
+      id: widget.metadata!.id,
       type: ArtworkType.AUDIO,
       nullArtworkWidget: placeholder,
       artworkBorder: BorderRadius.circular(16),
@@ -105,24 +111,11 @@ class _SpinningAlbumArtState extends State<SpinningAlbumArt>
     // The SlideTransition applies the horizontal/vertical movement (the "wavy" effect)
     return AspectRatio(
       aspectRatio: 1.0,
-      child: SlideTransition(
+      child: SlideTransition( // The Wavy Effect!
         position: _animation,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
-          child: StreamBuilder<PlayerState>(
-            stream: widget.playerStateStream,
-            builder: (context, snapshot) {
-              final isPlaying = snapshot.data?.playing ?? false;
-
-              // The RotationTransition applies the spinning effect
-              return RotationTransition(
-                turns: isPlaying
-                    ? Tween(begin: 0.0, end: 1.0).animate(_controller) // Use the same controller for rotation
-                    : const AlwaysStoppedAnimation(0.0), // Stop rotation when paused
-                child: _buildStaticArt(context),
-              );
-            },
-          ),
+          child: _buildStaticArt(context),
         ),
       ),
     );

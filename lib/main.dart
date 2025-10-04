@@ -11,7 +11,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Modern Music Player',
+      title: 'Offline Streamer',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         // Dark theme colors based on Spotify/Material dark theme principles

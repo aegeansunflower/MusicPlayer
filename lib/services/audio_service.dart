@@ -58,14 +58,7 @@ class AudioService {
     _loadFavorites();
     _initPlayer();
   }
-  void dispose() {
-    _favoritesController.close();
-    // It's generally safer to let the parent widget manage the AudioPlayer disposal,
-    // but if the service is a singleton, closing it here is essential.
-    // Assuming the player is meant to live longer, we'll only close the stream controllers.
-    // If the player needs to be closed, uncomment the line below:
-    // player.dispose();
-  }
+
   Future<void> _initPlayer() async {
     // Allows background playback (optional, but good practice)
     await player.setAudioSource(
@@ -173,7 +166,14 @@ class AudioService {
     else if (mode == LoopMode.all) await player.setLoopMode(LoopMode.one);
     else await player.setLoopMode(LoopMode.off);
   }
-
+  void dispose() {
+    _favoritesController.close();
+    // It's generally safer to let the parent widget manage the AudioPlayer disposal,
+    // but if the service is a singleton, closing it here is essential.
+    // Assuming the player is meant to live longer, we'll only close the stream controllers.
+    // If the player needs to be closed, uncomment the line below:
+    // player.dispose();
+  }
   // --- Favorites Persistence ---
 
   // Private method: Loads favorites on startup.
