@@ -14,10 +14,9 @@ class MyApp extends StatelessWidget {
       title: 'Offline Streamer',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        // Dark theme colors based on Spotify/Material dark theme principles
-        scaffoldBackgroundColor: const Color(0xFF121212), // Very dark gray
-        primaryColor: const Color(0xFFBB86FC), // Purple accent
-        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF121212),
+        primaryColor: const Color(0xFFBB86FC),
+        brightness: Brightness.light,
         textTheme: const TextTheme(
           headlineMedium: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           bodyLarge: TextStyle(color: Colors.white70),

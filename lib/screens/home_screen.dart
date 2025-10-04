@@ -179,7 +179,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const double bottomNavHeight =0;
+    const double bottomNavHeight = 0;
 
     // The widget options, now using _allSongs
     final List<Widget> widgetOptions = [

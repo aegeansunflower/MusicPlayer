@@ -42,8 +42,8 @@ class _SpinningAlbumArtState extends State<SpinningAlbumArt>
 
     // Animation Tween: defines the slow, floating shift (2% left/right, 2% up/down)
     _animation = Tween<Offset>(
-      begin: const Offset(0.02, 0.02), // Start slightly right and down
-      end: const Offset(-0.02, -0.02), // End slightly left and up
+      begin: const Offset(0, 0), // Start slightly right and down
+      end: const Offset(0, 0), // End slightly left and up
     ).animate(CurvedAnimation(
       parent: _controller,
       curve: Curves.easeInOut, // Smooth acceleration/deceleration
@@ -86,7 +86,7 @@ class _SpinningAlbumArtState extends State<SpinningAlbumArt>
       ),
       child: Icon(
         Icons.music_note,
-        size: 100,
+        size: 200,
         color: widget.primaryColor,
       ),
     );
@@ -102,7 +102,7 @@ class _SpinningAlbumArtState extends State<SpinningAlbumArt>
       type: ArtworkType.AUDIO,
       nullArtworkWidget: placeholder,
       artworkBorder: BorderRadius.circular(16),
-      artworkFit: BoxFit.cover,
+      artworkFit: BoxFit.contain,
     );
   }
 
@@ -110,7 +110,7 @@ class _SpinningAlbumArtState extends State<SpinningAlbumArt>
   Widget build(BuildContext context) {
     // The SlideTransition applies the horizontal/vertical movement (the "wavy" effect)
     return AspectRatio(
-      aspectRatio: 1.0,
+      aspectRatio: 1.2,
       child: SlideTransition( // The Wavy Effect!
         position: _animation,
         child: ClipRRect(
